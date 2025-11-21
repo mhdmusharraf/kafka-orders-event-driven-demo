@@ -89,3 +89,17 @@ kafka-orders-event-driven-demo/
       main.jsx              # React entrypoint
       App.jsx               # Dashboard UI
       index.css             # Tailwind entry (imports `@import "tailwindcss";`)
+
+```
+## How It Works
+
+- Producer generates random `Order` events every 1–2 seconds and publishes them to the `orders` topic (Avro-encoded).
+- Kafka stores the events durably and streams them to the consumer in the `order-consumer-group`.
+- Consumer deserialises each message, applies business logic, and updates running averages (overall and per product) in memory.
+- On transient errors, the consumer retries processing up to 3 times with a backoff delay before giving up.
+- Messages that still fail (or have deserialisation/permanent errors) are sent to the `orders-dlq` topic with an `errorReason` header.
+- The same consumer process exposes a REST API (`/metrics`, `/dlq`) which the React + Tailwind dashboard polls every second to render live stats and recent DLQ events.
+
+
+
+
