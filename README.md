@@ -1,1 +1,91 @@
-# kafka-orders-event-driven-demo
+# Kafka Orders Event-Driven Demo
+
+Event-driven orders processing system built for a big-data / streaming assignment:
+
+- **Backend**: Node.js, KafkaJS, Avro
+  - Produces random `Order` events to Kafka.
+  - Consumes events, maintains **running averages**, and implements **retry + DLQ**.
+  - Exposes a small **REST API** for metrics and DLQ events.
+- **Frontend**: Vite + React + Tailwind CSS
+  - Real-time dashboard showing totals, averages, and recent DLQ entries.
+
+---
+
+## 1. Architecture Overview
+
+### Data Flow
+
+1. **Producer (`backend/producer.js`)**
+   - Generates random `Order` events.
+   - Serialises each order with **Avro** using `order.avsc`.
+   - Publishes messages to Kafka topic **`orders`**.
+
+2. **Consumer + API (`backend/consumer-api.js`)**
+   - Subscribes to **`orders`**.
+   - Deserialises Avro payloads.
+   - Applies business logic with **simulated transient failures**:
+     - Retries on `TemporaryProcessingError` up to `MAX_RETRIES`.
+     - After exhaustion or permanent failure, forwards message to **DLQ topic `orders-dlq`**.
+   - Maintains **running averages**:
+     - Overall count and average price.
+     - Per-product counts and averages.
+   - Exposes an HTTP API:
+     - `GET /metrics` → running averages snapshot.
+     - `GET /dlq` → recent DLQ events (in-memory list).
+
+3. **Frontend (`frontend/`)**
+   - Polls the backend every second:
+     - `GET http://localhost:4000/metrics`
+     - `GET http://localhost:4000/dlq`
+   - Renders:
+     - Total orders processed.
+     - Overall average price.
+     - Per-product statistics table.
+     - Recent DLQ events table (time, orderId, reason).
+
+---
+
+## 2. Tech Stack
+
+**Backend**
+
+- Node.js
+- KafkaJS
+- Avro (`avsc`)
+- Express
+- CORS
+
+**Frontend**
+
+- Vite
+- React
+- Tailwind CSS (via `@tailwindcss/vite` plugin)
+
+**Infrastructure**
+
+- Apache Kafka (local installation **or** Docker Compose)
+- Topic names:
+  - `orders`
+  - `orders-dlq`
+
+---
+
+## 3. Project Structure
+
+```text
+kafka-orders-event-driven-demo/
+  docker-compose.yml        # Optional: Zookeeper + Kafka via Docker
+  backend/
+    package.json
+    order.avsc              # Avro schema for Order events
+    avro.js                 # Avro (de)serialisation helpers
+    producer.js             # Kafka producer (random orders)
+    consumer-api.js         # Kafka consumer + retry + DLQ + REST API
+  frontend/
+    package.json
+    vite.config.js          # Vite + Tailwind plugin config
+    index.html
+    src/
+      main.jsx              # React entrypoint
+      App.jsx               # Dashboard UI
+      index.css             # Tailwind entry (imports `@import "tailwindcss";`)
